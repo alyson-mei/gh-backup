@@ -2,12 +2,12 @@ github_profile: alyson-mei
 
 repos:
   - repo_name: gh-backup-r1
-    local_path: /home/alyson/PyProjects/for_tests/repo_1
+    local_path: /home/alyson/PyProjects/for_tests/github-backup/repo_1
     visibility: private
 
   - repo_name: gh-backup-r2
-    local_path: /home/alyson/PyProjects/for_tests/repo_2
+    local_path: /home/alyson/PyProjects/for_tests/github-backup/repo_2
     visibility: private
 
 schedule:
-  interval_minutes: 60   
+  interval_minutes: 1  
