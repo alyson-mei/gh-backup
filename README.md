@@ -2,7 +2,7 @@
 
 Keeps local folders backed up to GitHub. You list folders and repo names in
 a config file, and the tool commits and pushes on a schedule so there's
-always an off-machine copy.
+always an off-machine copy. Design and requirements by me, with code written by Claude.
 
 Example config:
 
@@ -25,10 +25,6 @@ schedule:
 With this config, both folders get turned into git repos (GitHub repos get
 created too, if they don't exist yet), and every 60 minutes any local
 changes are committed and pushed.
-
-This is for personal backups, not for running your active projects through.
-If you're actively branching and merging somewhere, keep using git the way
-you already do.
 
 **Status:** MVP, still testing. Runs from a terminal on Linux only for now.
 
