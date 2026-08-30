@@ -10,4 +10,4 @@ repos:
     visibility: private
 
 schedule:
-  interval_minutes: 1  
+  interval_minutes: 1  # recommended: 5 minutes or more

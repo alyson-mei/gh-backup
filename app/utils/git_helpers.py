@@ -5,10 +5,22 @@ Shared low-level git helpers, used by repo_init.py, repo_commit.py, repo_push.py
 import subprocess
 from pathlib import Path
 
+from config import DEFAULT_TIMEOUT_SECONDS
 
-def run_git(args: list[str], cwd: Path) -> tuple[int, str, str]:
-    """Run a git command in cwd, return (returncode, stdout, stderr)."""
-    result = subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True)
+
+def run_git(args: list[str], cwd: Path, timeout: int = DEFAULT_TIMEOUT_SECONDS) -> tuple[int, str, str]:
+    """
+    Run a git command in cwd, return (returncode, stdout, stderr).
+
+    Raises RuntimeError if the command doesn't finish within `timeout` seconds
+    (e.g. a hung network connection during pull/push).
+    """
+    try:
+        result = subprocess.run(
+            ["git", *args], cwd=cwd, capture_output=True, text=True, timeout=timeout
+        )
+    except subprocess.TimeoutExpired:
+        raise RuntimeError(f"[{cwd}] git {' '.join(args)} timed out after {timeout}s")
     return result.returncode, result.stdout.strip(), result.stderr.strip()
 
 

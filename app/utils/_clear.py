@@ -6,11 +6,14 @@ For each repo in the config:
     2. Delete the local .git directory (local files are left untouched).
 """
 
+import logging
 import shutil
 import urllib.error
 import urllib.request
 
-from config import Config, RepoConfig, load_config
+from config import Config, RepoConfig, load_config, setup_logging
+
+logger = logging.getLogger("gh_backup")
 
 
 def delete_github_repo(github_profile: str, repo_name: str, token: str) -> None:
@@ -21,29 +24,31 @@ def delete_github_repo(github_profile: str, repo_name: str, token: str) -> None:
         headers={"Authorization": f"token {token}", "Accept": "application/vnd.github+json"},
     )
     try:
-        urllib.request.urlopen(req)
-        print(f"[{repo_name}] deleted on GitHub")
+        urllib.request.urlopen(req, timeout=10)
+        logger.info("[%s] deleted on GitHub", repo_name)
     except urllib.error.HTTPError as e:
         if e.code == 404:
-            print(f"[{repo_name}] not found on GitHub, skipping")
+            logger.info("[%s] not found on GitHub, skipping", repo_name)
         else:
             raise RuntimeError(f"[{repo_name}] failed to delete on GitHub: {e.read().decode()}")
+    except urllib.error.URLError as e:
+        raise RuntimeError(f"[{repo_name}] could not reach GitHub API: {e.reason}")
 
 
-def delete_local_git(local_path) -> None:
-    """Remove the .git directory at local_path, if it exists."""
-    git_dir = local_path / ".git"
+def delete_local_git(repo: RepoConfig) -> None:
+    """Remove the .git directory at repo.local_path, if it exists."""
+    git_dir = repo.local_path / ".git"
     if git_dir.exists():
         shutil.rmtree(git_dir)
-        print(f"[{local_path}] .git removed")
+        logger.info("[%s] .git removed", repo.repo_name)
     else:
-        print(f"[{local_path}] no .git found, skipping")
+        logger.info("[%s] no .git found, skipping", repo.repo_name)
 
 
 def clear_repo(github_profile: str, repo: RepoConfig, token: str) -> None:
     """Delete the remote GitHub repo, then the local .git directory, for one repo."""
     delete_github_repo(github_profile, repo.repo_name, token)
-    delete_local_git(repo.local_path)
+    delete_local_git(repo)
 
 
 def clear_all(config: Config) -> None:
@@ -53,5 +58,6 @@ def clear_all(config: Config) -> None:
 
 
 if __name__ == "__main__":
+    setup_logging()
     config = load_config()
     clear_all(config)

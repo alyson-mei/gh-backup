@@ -5,8 +5,12 @@ For each repo: pull from origin on the current branch (conflicts are left
 for the user to resolve manually, not handled automatically), then push.
 """
 
-from app.git_helpers import get_current_branch, run_git
+import logging
+
+from app.utils.git_helpers import get_current_branch, run_git
 from config import RepoConfig
+
+logger = logging.getLogger("gh_backup")
 
 
 def pull_repo(repo: RepoConfig) -> bool:
@@ -22,20 +26,19 @@ def pull_repo(repo: RepoConfig) -> bool:
 
     code, out, err = run_git(["pull", "--no-rebase", "origin", branch], cwd=local_path)
     if code == 0:
-        print(f"[{local_path}] pull: {out or 'up to date'}")
+        logger.info("[%s] pull: %s", repo.repo_name, out or "up to date")
         return True
 
     low = (out + err).lower()
     if "conflict" in low:
-        print(f"[{local_path}] CONFLICT during pull, resolve manually:")
-        print(err or out)
+        logger.error("[%s] CONFLICT during pull, resolve manually:\n%s", repo.repo_name, err or out)
         return False
     if "couldn't find remote ref" in low or "unrelated histories" in low:
         # remote branch doesn't exist yet (freshly created repo) - nothing to pull
-        print(f"[{local_path}] pull skipped (remote branch not found yet)")
+        logger.info("[%s] pull skipped (remote branch not found yet)", repo.repo_name)
         return True
 
-    print(f"[{local_path}] pull failed: {err or out}")
+    logger.error("[%s] pull failed: %s", repo.repo_name, err or out)
     return False
 
 
@@ -46,8 +49,8 @@ def push_repo(repo: RepoConfig) -> None:
 
     code, out, err = run_git(["push", "-u", "origin", branch], cwd=local_path)
     if code != 0:
-        raise RuntimeError(f"[{local_path}] push failed: {err}")
-    print(f"[{local_path}] pushed: {out or err or 'ok'}")
+        raise RuntimeError(f"[{repo.repo_name}] push failed: {err}")
+    logger.info("[%s] pushed: %s", repo.repo_name, out or err or "ok")
 
 
 def sync_repo(repo: RepoConfig) -> None:
@@ -58,8 +61,9 @@ def sync_repo(repo: RepoConfig) -> None:
 
 
 if __name__ == "__main__":
-    from config import load_config
- 
+    from config import load_config, setup_logging
+
+    setup_logging()
     config = load_config()
     for repo in config.repos:
         sync_repo(repo)

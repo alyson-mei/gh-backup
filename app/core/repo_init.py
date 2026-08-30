@@ -11,27 +11,59 @@ For each repo in the config:
 """
 
 import json
+import logging
 import time
 import urllib.error
 import urllib.request
 
-from app.git_helpers import get_remote_url, is_git_repo, run_git
-from config import RepoConfig
+from app.utils.git_helpers import get_remote_url, is_git_repo, run_git
+from config import DEFAULT_TIMEOUT_SECONDS, RepoConfig
+
+logger = logging.getLogger("gh_backup")
 
 GITHUB_API_DELAY_SECONDS = 1
 
 
-def init_local_repo(local_path) -> None:
-    """Create local_path if missing and run `git init` if it isn't a repo yet."""
-    local_path.mkdir(parents=True, exist_ok=True)
+def init_local_repo(repo: RepoConfig) -> None:
+    """Create repo.local_path if missing and run `git init` if it isn't a repo yet."""
+    local_path = repo.local_path
+    try:
+        local_path.mkdir(parents=True, exist_ok=True)
+    except OSError as e:
+        raise RuntimeError(f"[{repo.repo_name}] cannot create local directory: {e}")
+
     if is_git_repo(local_path):
-        print(f"[{local_path}] repo already initialized, skipping")
+        logger.info("[%s] repo already initialized, skipping", repo.repo_name)
         return
 
     code, out, err = run_git(["init"], cwd=local_path)
     if code != 0:
-        raise RuntimeError(f"[{local_path}] git init failed: {err}")
-    print(f"[{local_path}] repo initialized")
+        raise RuntimeError(f"[{repo.repo_name}] git init failed: {err}")
+    logger.info("[%s] repo initialized", repo.repo_name)
+
+
+def _raise_for_github_error(repo_name: str, e: urllib.error.HTTPError, action: str) -> None:
+    """Turn a GitHub API HTTPError into a RuntimeError with a specific, actionable message."""
+    body = e.read().decode(errors="replace")
+    if e.code == 401:
+        raise RuntimeError(
+            f"[{repo_name}] GitHub rejected the token while trying to {action} "
+            f"(401 Unauthorized). The token may be missing, invalid, or expired."
+        )
+    if e.code == 403:
+        raise RuntimeError(
+            f"[{repo_name}] GitHub denied the request to {action} (403 Forbidden). "
+            f"This usually means the token lacks the required permissions "
+            f"(needs 'Contents' and 'Administration' repository permissions), "
+            f"or a rate limit was hit. Response: {body}"
+        )
+    if e.code == 422:
+        raise RuntimeError(
+            f"[{repo_name}] GitHub rejected the request to {action} (422 Unprocessable). "
+            f"This can happen if a repo with this name already exists under a "
+            f"different owner, or the name/visibility is invalid. Response: {body}"
+        )
+    raise RuntimeError(f"[{repo_name}] failed to {action} ({e.code}): {body}")
 
 
 def github_repo_exists(github_profile: str, repo_name: str, token: str) -> bool:
@@ -41,12 +73,12 @@ def github_repo_exists(github_profile: str, repo_name: str, token: str) -> bool:
         headers={"Authorization": f"token {token}", "Accept": "application/vnd.github+json"},
     )
     try:
-        urllib.request.urlopen(req, timeout=10)
+        urllib.request.urlopen(req, timeout=DEFAULT_TIMEOUT_SECONDS)
         return True
     except urllib.error.HTTPError as e:
         if e.code == 404:
             return False
-        raise
+        _raise_for_github_error(repo_name, e, "check repo existence")
     except urllib.error.URLError as e:
         raise RuntimeError(f"[{repo_name}] could not reach GitHub API: {e.reason}")
 
@@ -65,10 +97,10 @@ def create_github_repo(repo_name: str, visibility: str, token: str) -> None:
         },
     )
     try:
-        urllib.request.urlopen(req, timeout=10)
-        print(f"[{repo_name}] created on GitHub ({visibility})")
+        urllib.request.urlopen(req, timeout=DEFAULT_TIMEOUT_SECONDS)
+        logger.info("[%s] created on GitHub (%s)", repo_name, visibility)
     except urllib.error.HTTPError as e:
-        raise RuntimeError(f"[{repo_name}] failed to create on GitHub: {e.read().decode()}")
+        _raise_for_github_error(repo_name, e, "create repo")
     except urllib.error.URLError as e:
         raise RuntimeError(f"[{repo_name}] could not reach GitHub API: {e.reason}")
 
@@ -86,31 +118,32 @@ def ensure_remote(local_path, github_profile: str, repo_name: str, visibility: s
     GitHub if it doesn't exist yet, then add origin pointing to it.
     """
     if get_remote_url(local_path) is not None:
-        print(f"[{local_path}] remote origin already set, skipping")
+        logger.info("[%s] remote origin already set, skipping", repo_name)
         return
 
     time.sleep(GITHUB_API_DELAY_SECONDS)
     if not github_repo_exists(github_profile, repo_name, token):
         create_github_repo(repo_name, visibility, token)
     else:
-        print(f"[{repo_name}] already exists on GitHub")
+        logger.info("[%s] already exists on GitHub", repo_name)
 
     url = build_remote_url(github_profile, repo_name, token)
     code, out, err = run_git(["remote", "add", "origin", url], cwd=local_path)
     if code != 0:
-        raise RuntimeError(f"[{local_path}] failed to add remote: {err}")
-    print(f"[{local_path}] remote origin set")
+        raise RuntimeError(f"[{repo_name}] failed to add remote: {err}")
+    logger.info("[%s] remote origin set", repo_name)
 
 
 def init_repo(github_profile: str, repo: RepoConfig, token: str) -> None:
     """Run the local init + remote setup steps for a single repo."""
-    init_local_repo(repo.local_path)
+    init_local_repo(repo)
     ensure_remote(repo.local_path, github_profile, repo.repo_name, repo.visibility, token)
 
 
 if __name__ == "__main__":
-    from config import load_config
+    from config import load_config, setup_logging
 
+    setup_logging()
     config = load_config()
     for repo in config.repos:
         init_repo(config.github_profile, repo, config.github_token)

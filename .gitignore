@@ -1,1 +1,22 @@
+# Secrets
 .env
+
+# Logs
+gh_backup.log
+gh_backup.log.*
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+venv/
+.venv/
+*.egg-info/
+build/
+dist/
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
