@@ -3,11 +3,12 @@ Repo pipeline: init -> commit -> pull -> push.
 """
 
 import logging
+import time
 
 from app.core.repo_commit import commit_repo
 from app.core.repo_init import init_repo
 from app.core.repo_push import sync_repo
-from config import Config, RepoConfig
+from config import Config, RepoConfig, GITHUB_API_DELAY_SECONDS
 
 logger = logging.getLogger("gh_backup")
 
@@ -32,6 +33,7 @@ def run_all_pipelines(config: Config) -> None:
             run_repo_pipeline(config.github_profile, repo, config.github_token)
         except Exception:
             logger.exception("[%s] pipeline failed, skipping this repo", repo.repo_name)
+        time.sleep(GITHUB_API_DELAY_SECONDS)  # avoid hitting GitHub API rate limits
 
 
 if __name__ == "__main__":

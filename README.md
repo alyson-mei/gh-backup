@@ -16,7 +16,7 @@ repos:
 
   - repo_name: backup-repo-2
     local_path: /home/alyson/PyProjects/for_tests/repo_2
-    visibility: private
+    visibility: public
 
 schedule:
   interval_minutes: 60

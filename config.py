@@ -25,6 +25,7 @@ from dotenv import load_dotenv
 logger = logging.getLogger("gh_backup")
 
 DEFAULT_TIMEOUT_SECONDS = 10
+GITHUB_API_DELAY_SECONDS = 0.5
 
 LOG_FILE = "gh_backup.log"
 LOG_MAX_BYTES = 1_000_000  # ~1 MB per file
