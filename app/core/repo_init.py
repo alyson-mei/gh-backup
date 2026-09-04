@@ -17,11 +17,9 @@ import urllib.error
 import urllib.request
 
 from app.utils.git_helpers import get_remote_url, is_git_repo, run_git
-from config import DEFAULT_TIMEOUT_SECONDS, RepoConfig
+from config import DEFAULT_TIMEOUT_SECONDS, GITHUB_API_DELAY_SECONDS, RepoConfig
 
 logger = logging.getLogger("gh_backup")
-
-GITHUB_API_DELAY_SECONDS = 1
 
 
 def init_local_repo(repo: RepoConfig) -> None:

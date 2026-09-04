@@ -8,6 +8,10 @@ repos:
   - repo_name: mathematics
     local_path: /home/alyson/Vaults/Math Notes
     visibility: public
+    
+  - repo_name: handwritten
+    local_path: /home/alyson/Handwritten
+    visibility: private
 
 schedule:
   interval_minutes: 5  # recommended: 5 minutes or more
