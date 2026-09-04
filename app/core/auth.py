@@ -1,5 +1,7 @@
 import json
 import os
+import shutil
+import subprocess
 import sys
 import time
 import urllib.error
@@ -13,6 +15,31 @@ CLIENT_ID = "Ov23liT0WwQvkS2gxWhj"
 DEVICE_CODE_URL = "https://github.com/login/device/code"
 TOKEN_URL = "https://github.com/login/oauth/access_token"
 SCOPES = "repo"
+
+
+def copy_to_clipboard(text: str) -> bool:
+    """Copies text to clipboard on Linux (Wayland/X11) or macOS."""
+    clipboard_tools = [
+        ("wl-copy", []),
+        ("xclip", ["-selection", "clipboard"]),
+        ("xsel", ["--clipboard", "--input"]),
+        ("pbcopy", []),
+    ]
+
+    for tool, args in clipboard_tools:
+        if shutil.which(tool):
+            try:
+                subprocess.run(
+                    [tool] + args,
+                    input=text.encode("utf-8"),
+                    check=True,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                )
+                return True
+            except Exception:
+                continue
+    return False
 
 
 def request_device_code(client_id: str) -> dict:
@@ -119,12 +146,17 @@ def main():
     device_code = device_data["device_code"]
     interval = device_data.get("interval", 5)
 
+    # Automatically copy code to clipboard
+    is_copied = copy_to_clipboard(user_code)
+
     print("\n" + "=" * 50)
-    print(f"Your one-time code:  {user_code}")
+    print(f"One-time code:       {user_code}")
+    if is_copied:
+        print("Status:              Code copied to clipboard! (Press Ctrl+V in browser)")
     print(f"Verification URL:    {verification_uri}")
     print("=" * 50 + "\n")
 
-    print("Opening browser for authorization...")
+    print("Opening browser...")
     try:
         webbrowser.open(verification_uri)
     except Exception:
